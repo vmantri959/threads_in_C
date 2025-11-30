@@ -2,12 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <stdatomic.h>
 #include <time.h>
 
 typedef struct{
-	atomic_int num1;
-	atomic_int num2;
+	int num1;
+	int num2;
 } curr_numbers;
 
 mtx_t lock;
@@ -18,13 +17,14 @@ int add_numbers(void* arg) //Need to be of return type int
 	curr_numbers* given_nums = (curr_numbers*) arg;
 	while(true)
 	{
-		if((atomic_fetch_add(&(given_nums->num1), 1) + atomic_load(&(given_nums->num2))) % 5 == 0)
+		if((given_nums->num1 + given_nums->num2) % 5 == 0)
 		{
 			mtx_lock(&lock);
 			cnd_signal(&cond);
 			mtx_unlock(&lock);
 		}
-		thrd_sleep(&(struct timespec) {.tv_sec=5}, NULL);
+		thrd_sleep(&(struct timespec) {.tv_sec=1}, NULL);
+		given_nums->num1 += 1;
 	}
 	return EXIT_SUCCESS;
 }
@@ -38,7 +38,7 @@ int print_divisible(void* arg)
 		mtx_lock(&lock);
 		cnd_wait(&cond, &lock);
 		double elapsed_time = difftime(time(NULL), start_time);
-		printf("Number %d is divisible by 5, received time in %f\n", -1 + atomic_load(&(given_nums->num1)) + atomic_load(&(given_nums->num2)), difftime(time(NULL), start_time));
+		printf("Number %d is divisible by 5, received time in %f\n", (given_nums->num1) + (given_nums->num2), difftime(time(NULL), start_time));
 		mtx_unlock(&lock);
 	}
 	return EXIT_SUCCESS;
@@ -54,8 +54,8 @@ int main(void)
 	cnd_init(&cond);
 
 	curr_numbers sample;
-	atomic_store(&(sample.num1), 5); 
-	atomic_store(&(sample.num2), 2); 
+	sample.num1 =  5; 
+	sample.num2 =  5; 
 
 	thrd_create(&add_numbers_thrd_ptr, add_numbers, (void*) &sample);
 	thrd_create(&print_divisible_thrd_ptr, print_divisible, (void*) &sample);
